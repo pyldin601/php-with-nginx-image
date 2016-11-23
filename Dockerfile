@@ -2,9 +2,18 @@ FROM        debian:jessie
 
 MAINTAINER  Roman Lakhtadyr <roman.lakhtadyr@gmail.com>
 
+ARG         PHP_VERSION=7.0
+ARG         PHP_INI_FILES="/etc/php/${PHP_VERSION}/fpm/php.ini \
+                           /etc/php/${PHP_VERSION}/cli/php.ini"
+
 ENV         DEBIAN_FRONTEND=noninteractive
 
-ARG         PHP_VERSION=7.0
+
+VOLUME      /var/lib/php/sessions
+
+COPY        supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY        nginx-server.conf /etc/nginx/sites-available/nginx-server.conf
+COPY        index.php /var/app/public/index.php
 
 RUN         apt-key adv --fetch-keys http://www.dotdeb.org/dotdeb.gpg && \
 
@@ -26,13 +35,14 @@ RUN         apt-key adv --fetch-keys http://www.dotdeb.org/dotdeb.gpg && \
 
             mkdir -p /var/app/public && \
 
-            curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+            curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer && \
 
-COPY        supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-COPY        nginx-server.conf /etc/nginx/sites-available/nginx-server.conf
-COPY        index.php /var/app/public/index.php
+            sed -i 's/.*post_max_size.*/post_max_size = 256M/;\
+                    s/.*upload_max_filesize.*/upload_max_filesize = 256M/;\
+                    s/.*max_file_uploads.*/max_file_uploads = 1/' \
+                    ${PHP_INI_FILES} && \
 
-RUN         ln -s /etc/nginx/sites-available/nginx-server.conf /etc/nginx/sites-enabled/nginx-server.conf
+            ln -s /etc/nginx/sites-available/nginx-server.conf /etc/nginx/sites-enabled/nginx-server.conf
 
 EXPOSE      80
 CMD         ["/usr/bin/supervisord"]
